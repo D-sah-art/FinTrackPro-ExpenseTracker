@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinTrack Pro — Smart Personal &amp; Semester Expense Tracker</title>
+  <meta name="description" content="Full-stack semester expense tracker and personal finance manager with SQLite backend, budget caps, analytics, and printable statements." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN 3.4.17 -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#1e1b4b',
+              950: '#0f0e26',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js 4.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- External Stylesheet (Static + Local File Support) -->
+  <link rel="stylesheet" href="../static/css/styles.css" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Floating Toast Notifications -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Header Navigation -->
+  <header class="bg-[#111827]/90 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-30 no-print transition-colors">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Status -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-display font-extrabold text-white text-xl shadow-lg shadow-indigo-500/20">
+          ₹
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display font-bold text-base sm:text-lg leading-tight tracking-tight text-white">FinTrack Pro</h1>
+            <span id="serverStatusBadge" class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Connecting...
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Personal &amp; Semester Expense Tracker</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav id="mainNav" class="flex items-center gap-1 bg-slate-900/80 p-1 rounded-2xl border border-slate-800 text-xs sm:text-sm overflow-x-auto">
+        <button type="button" data-tab="dashboard" class="nav-tab px-3.5 py-1.5 rounded-xl font-semibold bg-indigo-600 text-white shadow-sm transition">Dashboard</button>
+        <button type="button" data-tab="transactions" class="nav-tab px-3.5 py-1.5 rounded-xl font-medium text-slate-400 hover:text-white transition">Transactions</button>
+        <button type="button" data-tab="budgets" class="nav-tab px-3.5 py-1.5 rounded-xl font-medium text-slate-400 hover:text-white transition">Budgets &amp; Caps</button>
+        <button type="button" data-tab="categories" class="nav-tab px-3.5 py-1.5 rounded-xl font-medium text-slate-400 hover:text-white transition">Categories</button>
+        <button type="button" data-tab="analytics" class="nav-tab px-3.5 py-1.5 rounded-xl font-medium text-slate-400 hover:text-white transition">Analytics &amp; Backup</button>
+        <button type="button" data-tab="docs" class="nav-tab px-3.5 py-1.5 rounded-xl font-medium text-slate-400 hover:text-white transition">Project &amp; Viva</button>
+      </nav>
+
+      <!-- Profile & Theme Controls -->
+      <div class="flex items-center gap-2">
+        <button type="button" id="themeToggleBtn" class="p-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          ☀️ Light Mode
+        </button>
+        <button type="button" id="openAuthModalBtn" class="flex items-center gap-2 text-xs bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/40 text-indigo-300 px-3 py-1.5 rounded-xl font-semibold transition">
+          <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+          <span id="currentUserBadge">Demo Student</span>
+          <span class="text-indigo-400 text-[10px]">⇄ Switch</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Budget Alert Banners Area -->
+  <div id="alertBannerArea" class="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-4 empty:hidden no-print"></div>
+
+  <!-- Main Application Body -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-5 flex-1 space-y-6">
+
+    <!-- Global Toolbar & Quick Expense Presets -->
+    <section class="glass-card p-4 flex flex-wrap items-center justify-between gap-3 no-print">
+      <!-- Month & Currency Filters -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div>
+          <label for="monthFilter" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Billing Month</label>
+          <input type="month" id="monthFilter" value="2026-10" class="text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+        </div>
+        <div>
+          <label for="currencySelect" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Currency</label>
+          <select id="currencySelect" class="text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+            <option value="₹">INR (₹)</option>
+            <option value="$">USD ($)</option>
+            <option value="€">EUR (€)</option>
+            <option value="£">GBP (£)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" id="openAddModalBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5 transform hover:-translate-y-0.5">
+          <span>+ Record Transaction</span>
+        </button>
+        <button type="button" id="exportCsvBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1">
+          <span>📥 CSV</span>
+        </button>
+        <button type="button" id="printReportBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1">
+          <span>🖨️ Statement / PDF</span>
+        </button>
+        <button type="button" id="resetDemoBtn" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold px-3 py-2 rounded-xl transition">
+          ↺ Reset Demo
+        </button>
+      </div>
+    </section>
+
+    <!-- Quick Expense Add Chips (1-Click Presets) -->
+    <div id="quickChipsSection" class="flex items-center gap-2 overflow-x-auto py-1 no-print">
+      <span class="text-xs font-semibold text-slate-400 whitespace-nowrap mr-1">⚡ Quick Add:</span>
+      <button type="button" class="quick-chip px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-indigo-600/20 border border-slate-700 hover:border-indigo-500/40 text-slate-300 hover:text-white transition whitespace-nowrap" data-title="Canteen Lunch / Meal" data-amount="120" data-category="Food &amp; Dining">
+        🍕 Lunch ₹120
+      </button>
+      <button type="button" class="quick-chip px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-indigo-600/20 border border-slate-700 hover:border-indigo-500/40 text-slate-300 hover:text-white transition whitespace-nowrap" data-title="Chai / Coffee Break" data-amount="40" data-category="Food &amp; Dining">
+        ☕ Coffee ₹40
+      </button>
+      <button type="button" class="quick-chip px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-indigo-600/20 border border-slate-700 hover:border-indigo-500/40 text-slate-300 hover:text-white transition whitespace-nowrap" data-title="Metro / Bus Transit" data-amount="50" data-category="Transport">
+        🚌 Transit ₹50
+      </button>
+      <button type="button" class="quick-chip px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-indigo-600/20 border border-slate-700 hover:border-indigo-500/40 text-slate-300 hover:text-white transition whitespace-nowrap" data-title="Photocopy &amp; Lab Manuals" data-amount="250" data-category="Education &amp; Books">
+        📚 Notes/Print ₹250
+      </button>
+      <button type="button" class="quick-chip px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/80 hover:bg-indigo-600/20 border border-slate-700 hover:border-indigo-500/40 text-slate-300 hover:text-white transition whitespace-nowrap" data-title="Grocery &amp; Snacks Essentials" data-amount="450" data-category="Shopping &amp; Personal">
+        🛒 Groceries ₹450
+      </button>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 1: DASHBOARD                               -->
+    <!-- ============================================== -->
+    <div id="tab-dashboard" class="tab-panel space-y-6">
+      
+      <!-- KPI Hero Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Monthly Inflow -->
+        <div class="glass-card interactive-card p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Inflow</span>
+            <span class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">↓</span>
+          </div>
+          <p id="kpiIncome" class="text-2xl lg:text-3xl font-extrabold font-display text-emerald-400 mt-2">₹0.00</p>
+          <p id="kpiIncomeCount" class="text-xs text-slate-400 mt-1">0 deposit(s) this month</p>
+          <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/5 rounded-full pointer-events-none"></div>
+        </div>
+
+        <!-- Monthly Outflow -->
+        <div class="glass-card interactive-card p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Outflow</span>
+            <span class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center font-bold text-sm">↑</span>
+          </div>
+          <p id="kpiExpense" class="text-2xl lg:text-3xl font-extrabold font-display text-rose-400 mt-2">₹0.00</p>
+          <p id="kpiExpenseCount" class="text-xs text-slate-400 mt-1">Avg ₹0.00/day</p>
+          <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-rose-500/5 rounded-full pointer-events-none"></div>
+        </div>
+
+        <!-- Net Savings Balance -->
+        <div class="glass-card interactive-card p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Net Savings</span>
+            <span class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-sm">₹</span>
+          </div>
+          <p id="kpiBalance" class="text-2xl lg:text-3xl font-extrabold font-display text-indigo-400 mt-2">₹0.00</p>
+          <p id="kpiSavingsRate" class="text-xs text-slate-400 mt-1">Savings rate: 0%</p>
+          <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-indigo-500/5 rounded-full pointer-events-none"></div>
+        </div>
+
+        <!-- Budget Utilization -->
+        <div class="glass-card interactive-card p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Budget Cap Used</span>
+            <span id="kpiBudgetPct" class="text-sm font-bold font-display text-amber-400">0%</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2.5 rounded-full mt-4 overflow-hidden">
+            <div id="kpiBudgetBar" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <p id="kpiBudgetRemaining" class="text-xs text-slate-400 mt-2.5">₹0.00 remaining</p>
+        </div>
+
+      </div>
+
+      <!-- Interactive Charts 2x2 Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Category Breakdown Chart -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-display font-bold text-base text-slate-100">Expenses by Category</h2>
+              <p class="text-xs text-slate-400">Distribution for selected billing month</p>
+            </div>
+          </div>
+          <div class="relative h-64 sm:h-72">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Daily Spending Trend Line Chart -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-display font-bold text-base text-slate-100">Daily Spending Velocity</h2>
+              <p class="text-xs text-slate-400">Day-by-day expense curve across month</p>
+            </div>
+          </div>
+          <div class="relative h-64 sm:h-72">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Budget vs Actual Bar Chart -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-display font-bold text-base text-slate-100">Budget vs. Actual Outflow</h2>
+              <p class="text-xs text-slate-400">Category spending against set limits</p>
+            </div>
+          </div>
+          <div class="relative h-64 sm:h-72">
+            <canvas id="budgetCompareChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Payment Method Distribution Chart -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-display font-bold text-base text-slate-100">Payment Channel Breakdown</h2>
+              <p class="text-xs text-slate-400">UPI / QR vs Card vs Cash vs Net Banking</p>
+            </div>
+          </div>
+          <div class="relative h-64 sm:h-72">
+            <canvas id="paymentMethodChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Recent Transactions Section -->
+      <div class="glass-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="font-display font-bold text-base text-slate-100">Recent Transactions</h2>
+            <p class="text-xs text-slate-400">Most recent income and expenses logged</p>
+          </div>
+          <button type="button" id="viewAllTxBtn" class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 no-print">
+            View &amp; Filter All &rarr;
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                <th class="py-2.5 px-3.5">Date</th>
+                <th class="py-2.5 px-3.5">Title &amp; Note</th>
+                <th class="py-2.5 px-3.5">Category</th>
+                <th class="py-2.5 px-3.5">Method</th>
+                <th class="py-2.5 px-3.5 text-right">Amount</th>
+                <th class="py-2.5 px-3.5 text-right no-print">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recentTxTableBody" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 2: TRANSACTIONS LIST & ADVANCED FILTERS   -->
+    <!-- ============================================== -->
+    <div id="tab-transactions" class="tab-panel hidden space-y-4">
+      
+      <!-- Filter Toolbar -->
+      <div class="glass-card p-4 space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Realtime Search -->
+          <div class="sm:col-span-2">
+            <label for="searchTxInput" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Search Description, Notes or Category</label>
+            <input type="text" id="searchTxInput" placeholder="e.g. Textbooks, Rent, Swiggy, Wi-Fi..." class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <!-- Category -->
+          <div>
+            <label for="filterCategorySelect" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+            <select id="filterCategorySelect" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="ALL">All Categories</option>
+            </select>
+          </div>
+          <!-- Type -->
+          <div>
+            <label for="filterTypeSelect" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Transaction Type</label>
+            <select id="filterTypeSelect" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="ALL">All Types</option>
+              <option value="expense">Expense (-)</option>
+              <option value="income">Income (+)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1 border-t border-slate-800">
+          <div>
+            <label for="filterMethodSelect" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Payment Method</label>
+            <select id="filterMethodSelect" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="ALL">All Methods</option>
+              <option value="UPI / QR">UPI / QR</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Cash">Cash</option>
+              <option value="Net Banking">Net Banking</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterStartDate" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
+            <input type="date" id="filterStartDate" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="filterEndDate" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
+            <input type="date" id="filterEndDate" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="sortTxSelect" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Sort Field</label>
+            <select id="sortTxSelect" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="tx_date">Date</option>
+              <option value="amount">Amount</option>
+              <option value="title">Title / Description</option>
+            </select>
+          </div>
+          <div class="flex items-end gap-2">
+            <div class="flex-1">
+              <label for="sortOrderSelect" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Order</label>
+              <select id="sortOrderSelect" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="desc">Descending ↓</option>
+                <option value="asc">Ascending ↑</option>
+              </select>
+            </div>
+            <button type="button" id="clearFiltersBtn" class="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Count & Summary Strip -->
+      <div id="txCountStrip" class="text-xs text-slate-400 px-1 font-medium"></div>
+
+      <!-- Transactions Full Table -->
+      <div class="glass-card p-5">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                <th class="py-2.5 px-3.5">Date</th>
+                <th class="py-2.5 px-3.5">Title &amp; Note</th>
+                <th class="py-2.5 px-3.5">Category</th>
+                <th class="py-2.5 px-3.5">Payment Method</th>
+                <th class="py-2.5 px-3.5 text-right">Amount</th>
+                <th class="py-2.5 px-3.5 text-right no-print">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fullTxTableBody" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 3: BUDGETS & ALERTS                        -->
+    <!-- ============================================== -->
+    <div id="tab-budgets" class="tab-panel hidden space-y-6">
+      <div class="glass-card p-6 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="font-display font-bold text-lg text-slate-100">Monthly Category Budget Limits</h2>
+            <p class="text-xs text-slate-400">Establish custom monthly caps. Threshold alerts will automatically display when reaching 80% (Warning) and 100% (Exceeded).</p>
+          </div>
+          <button type="button" id="saveBudgetsBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition">
+            Save All Caps
+          </button>
+        </div>
+        <div id="budgetCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2"></div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 4: CATEGORIES MANAGEMENT                  -->
+    <!-- ============================================== -->
+    <div id="tab-categories" class="tab-panel hidden space-y-6">
+      
+      <!-- Create Custom Category Card -->
+      <div class="glass-card p-6">
+        <h2 class="font-display font-bold text-lg text-slate-100 mb-1">Add Custom Category</h2>
+        <p class="text-xs text-slate-400 mb-4">Define personalized income or expense streams tailored to your college semester or personal budget.</p>
+
+        <form id="customCategoryForm" class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[200px]">
+            <label for="customCatName" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Category Name</label>
+            <input type="text" id="customCatName" required placeholder="e.g. Gym &amp; Fitness, Subscriptions, Internship" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div class="w-36">
+            <label for="customCatType" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Flow Type</label>
+            <select id="customCatType" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="expense">Expense (-)</option>
+              <option value="income">Income (+)</option>
+            </select>
+          </div>
+          <div>
+            <label for="customCatColor" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Color Tag</label>
+            <input type="color" id="customCatColor" value="#8b5cf6" class="w-12 h-10 p-1 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer" />
+          </div>
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
+            + Add Category
+          </button>
+        </form>
+      </div>
+
+      <!-- Categories Lists -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Expense Categories -->
+        <div class="glass-card p-5 space-y-3">
+          <h3 class="font-display font-bold text-base text-slate-100 flex items-center justify-between">
+            <span>Expense Categories</span>
+            <span class="text-xs text-slate-400">Spending streams</span>
+          </h3>
+          <div id="expenseCategoriesList" class="space-y-2"></div>
+        </div>
+
+        <!-- Income Categories -->
+        <div class="glass-card p-5 space-y-3">
+          <h3 class="font-display font-bold text-base text-slate-100 flex items-center justify-between">
+            <span>Income Categories</span>
+            <span class="text-xs text-emerald-400">Inflow sources</span>
+          </h3>
+          <div id="incomeCategoriesList" class="space-y-2"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 5: ANALYTICS & BACKUP                      -->
+    <!-- ============================================== -->
+    <div id="tab-analytics" class="tab-panel hidden space-y-6">
+      
+      <!-- Financial Intelligence Velocity Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="glass-card p-4">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Top Spending Category</span>
+          <p id="analyticsTopCategory" class="text-base font-bold text-indigo-400 font-display mt-1">Loading...</p>
+        </div>
+        <div class="glass-card p-4">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avg Daily Outflow</span>
+          <p id="analyticsAvgDaily" class="text-base font-bold text-rose-400 font-display mt-1">₹0.00 / day</p>
+        </div>
+        <div class="glass-card p-4">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Projected Month-End Spend</span>
+          <p id="analyticsProjectedSpend" class="text-base font-bold text-amber-400 font-display mt-1">₹0.00</p>
+        </div>
+        <div class="glass-card p-4">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Highest Single Outflow</span>
+          <p id="analyticsHighestTx" class="text-base font-bold text-slate-200 font-display mt-1 truncate">None</p>
+        </div>
+      </div>
+
+      <!-- Data Portability & Backup Hub -->
+      <div class="glass-card p-6 space-y-4">
+        <div>
+          <h2 class="font-display font-bold text-lg text-slate-100">Data Management &amp; Portability Hub</h2>
+          <p class="text-xs text-slate-400">Export complete transactional datasets, generate printable submission reports, or restore from a JSON backup file.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          
+          <!-- JSON Full Backup Export -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <h3 class="font-semibold text-sm text-slate-200">1. Full JSON Snapshot</h3>
+            <p class="text-xs text-slate-400">Exports transactions, categories, and monthly caps in portable JSON schema format.</p>
+            <button type="button" id="exportJsonBtn" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded-lg transition">
+              Download JSON Backup
+            </button>
+          </div>
+
+          <!-- JSON Restore / Import -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <h3 class="font-semibold text-sm text-slate-200">2. Restore from JSON Backup</h3>
+            <p class="text-xs text-slate-400">Upload a previously saved FinTrack JSON backup file to populate SQLite / LocalStorage.</p>
+            <label class="block mt-2 cursor-pointer text-center bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-lg border border-slate-700 transition">
+              <span>Choose JSON File</span>
+              <input type="file" id="importJsonInput" accept=".json,application/json" class="hidden" />
+            </label>
+          </div>
+
+          <!-- Printable PDF Statement -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <h3 class="font-semibold text-sm text-slate-200">3. Official Academic Statement</h3>
+            <p class="text-xs text-slate-400">Generate a clean, print-ready semester ledger suitable for submission or paper review.</p>
+            <button type="button" onclick="printStatement()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-lg border border-slate-700 transition">
+              Print / Save as PDF
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- TAB 6: PROJECT DOCUMENTATION & VIVA GUIDE     -->
+    <!-- ============================================== -->
+    <div id="tab-docs" class="tab-panel hidden space-y-6">
+      <div class="glass-card p-6 space-y-6">
+        <div>
+          <h2 class="font-display font-bold text-xl text-slate-100">FinTrack Pro — Semester Project Architecture &amp; Viva Guide</h2>
+          <p class="text-xs text-slate-400 mt-1">Technical specification for college laboratory evaluation, internal assessments, and end-semester project viva.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Architecture Card -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <h3 class="font-semibold text-sm text-indigo-400">1. Full-Stack Dual Architecture</h3>
+            <ul class="text-xs text-slate-300 space-y-1.5 list-disc pl-4 leading-relaxed">
+              <li><strong>REST API Backend:</strong> Python 3 + Flask (`app.py`) providing CRUD endpoints for transactions, categories, budgets, and user profiles.</li>
+              <li><strong>Database Layer:</strong> SQLite3 with B-Tree indices on `(user_id, tx_date)` and `(user_id, category)` for O(log N) fast lookups.</li>
+              <li><strong>Dual-Mode Client:</strong> Automatically binds to the Flask SQLite REST API when accessed over HTTP, with transparent fallback to browser `localStorage` in static zero-install mode.</li>
+              <li><strong>Analytics Engine:</strong> Real-time category percentage aggregations and Chart.js 4.4 interactive canvas visualization.</li>
+            </ul>
+          </div>
+
+          <!-- Database Schema 3NF -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <h3 class="font-semibold text-sm text-indigo-400">2. Relational Database Schema (3NF)</h3>
+            <ul class="text-xs text-slate-300 space-y-1.5 list-disc pl-4 leading-relaxed">
+              <li><code>users</code>: Primary entity storing <code>id (PK)</code>, <code>username (UNIQUE)</code>, <code>password_hash</code>, <code>created_at</code>.</li>
+              <li><code>categories</code>: User-scoped streams <code>id (PK)</code>, <code>user_id (FK)</code>, <code>name</code>, <code>cat_type</code>, <code>color</code>, <code>icon</code> with composite unique constraint.</li>
+              <li><code>budgets</code>: Monthly limits <code>id (PK)</code>, <code>user_id (FK)</code>, <code>category</code>, <code>monthly_limit</code> with cascading delete.</li>
+              <li><code>transactions</code>: Itemized ledger <code>id (PK)</code>, <code>user_id (FK)</code>, <code>title</code>, <code>amount</code>, <code>tx_type</code>, <code>category</code>, <code>payment_method</code>, <code>tx_date</code>, <code>notes</code>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Viva Questions & Answers -->
+        <div class="space-y-3 pt-2">
+          <h3 class="font-display font-bold text-base text-slate-100">Top Viva Voce Questions &amp; Model Answers</h3>
+          
+          <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+            <p class="text-xs font-semibold text-indigo-300">Q1: How does FinTrack Pro ensure data consistency and multi-user isolation?</p>
+            <p class="text-xs text-slate-400 leading-relaxed">Every transaction, category, and budget row is strictly indexed by foreign key <code>user_id REFERENCES users(id) ON DELETE CASCADE</code>. All REST API endpoints parameterize queries with SQLite prepared statements preventing SQL injection and isolating multi-student ledgers.</p>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+            <p class="text-xs font-semibold text-indigo-300">Q2: How are budget warning thresholds calculated?</p>
+            <p class="text-xs text-slate-400 leading-relaxed">Budget utilization is computed dynamically as <code>(SUM(expense_amount) / monthly_limit) * 100</code> per category for the selected billing month. Threshold triggers display amber warnings at ≥80% and red alert banners at ≥100%.</p>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+            <p class="text-xs font-semibold text-indigo-300">Q3: How does the application handle offline vs online server states?</p>
+            <p class="text-xs text-slate-400 leading-relaxed">On load, the frontend issues an asynchronous probe to <code>/api/status</code>. If the Flask server responds, it synchronizes via REST API. If the connection fails or if opened as a local <code>file:///</code> URL, it falls back seamlessly to browser <code>localStorage</code> with zero disruption.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================== -->
+  <!-- PRINT-ONLY OFFICIAL FINANCIAL STATEMENT        -->
+  <!-- ============================================== -->
+  <div class="print-only p-8 text-slate-900 bg-white">
+    <div class="border-b-2 border-slate-800 pb-4 mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold font-display">FinTrack Pro — Official Financial Statement</h1>
+          <p class="text-xs text-slate-600">Personal &amp; Semester Expense Ledger</p>
+        </div>
+        <div class="text-right text-xs">
+          <p><strong>Account Holder:</strong> <span id="statementUserName">Demo Student</span></p>
+          <p><strong>Billing Period:</strong> <span id="statementMonth">2026-10</span></p>
+          <p><strong>Generated on:</strong> <span id="statementGenDate"></span></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-xs text-slate-500 mb-6">
+      This statement is an official certified summary generated from the FinTrack Pro relational ledger.
+    </div>
+
+    <!-- Printable Transaction Table will be printed from the active transactions view -->
+  </div>
+
+  <!-- ============================================== -->
+  <!-- ADD / EDIT TRANSACTION MODAL                   -->
+  <!-- ============================================== -->
+  <div id="txModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full p-6 space-y-4 bg-[#111827] border-slate-700 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 id="txModalTitle" class="font-display font-bold text-slate-100 text-base">Record New Transaction</h3>
+        <button type="button" id="closeTxModalBtn" class="text-slate-400 hover:text-white text-sm font-semibold p-1">✕</button>
+      </div>
+
+      <form id="txForm" class="space-y-3.5">
+        <input type="hidden" id="txEditId" value="" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="txType" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Type</label>
+            <select id="txType" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="expense">Expense (-)</option>
+              <option value="income">Income (+)</option>
+            </select>
+          </div>
+          <div>
+            <label for="txDate" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Date</label>
+            <input type="date" id="txDate" required class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div>
+          <label for="txTitle" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Title / Description</label>
+          <input type="text" id="txTitle" required placeholder="e.g. Lab Manual, Hostel Rent, Swiggy" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="txAmount" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Amount</label>
+            <input type="number" id="txAmount" required min="0.01" step="0.01" placeholder="0.00" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold" />
+          </div>
+          <div>
+            <label for="txCategory" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+            <select id="txCategory" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+          </div>
+        </div>
+
+        <div>
+          <label for="txMethod" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Payment Method</label>
+          <select id="txMethod" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="UPI / QR">UPI / QR</option>
+            <option value="Debit Card">Debit Card</option>
+            <option value="Cash">Cash</option>
+            <option value="Net Banking">Net Banking</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="txNotes" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Notes (Optional)</label>
+          <input type="text" id="txNotes" placeholder="Bill receipt # or extra comments" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" id="cancelTxModalBtn" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition">Save Transaction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- USER SWITCH / REGISTER MODAL                   -->
+  <!-- ============================================== -->
+  <div id="authModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="glass-card max-w-sm w-full p-6 space-y-4 bg-[#111827] border-slate-700 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-display font-bold text-slate-100 text-base">User Profile Switch / Create</h3>
+        <button type="button" id="closeAuthModalBtn" class="text-slate-400 hover:text-white text-sm font-semibold p-1">✕</button>
+      </div>
+      <p class="text-xs text-slate-400">Each profile maintains completely isolated transactions, category caps, and financial budgets.</p>
+
+      <!-- Existing profiles -->
+      <div class="space-y-1.5 pt-1">
+        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Existing Accounts</label>
+        <div id="existingUsersList" class="space-y-1.5 max-h-36 overflow-y-auto"></div>
+      </div>
+
+      <!-- Create / Switch Form -->
+      <form id="authForm" class="space-y-3 pt-2 border-t border-slate-800">
+        <div>
+          <label for="authUsername" class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Enter Profile Name</label>
+          <input type="text" id="authUsername" required placeholder="e.g. Aarav Sharma" class="w-full text-sm bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div class="pt-1 flex justify-end gap-2">
+          <button type="button" id="cancelAuthModalBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white">Login / Switch</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Engine Script (Static + Local File Support) -->
+  <script src="../static/js/app.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

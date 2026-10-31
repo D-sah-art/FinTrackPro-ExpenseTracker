@@ -401,12 +401,6 @@ Base URL: `http://127.0.0.1:5000`
 
 ---
 
-### Option B: Standalone Zero-Install Mode (Offline)
-
-Double-click `templates/index.html` in your file explorer.
-- Runs directly inside your web browser via `file://`.
-- Operates through browser `localStorage` with no Python or server setup required.
-
 
 ## 🔮 Future Engineering Roadmap
 
@@ -415,24 +409,6 @@ Double-click `templates/index.html` in your file explorer.
 - [ ] **Telegram Bot Integration**: Webhook service allowing students to log expenses on-the-go via simple Telegram chat commands (`/spent 150 Lunch`).
 - [ ] **Multi-Currency Live Rates**: Live currency exchange rates API integration for international scholars.
 
----
-
-## 🔧 Troubleshooting & FAQs
-
-**Q: Port 5000 is already in use by another program.**  
-A: You can launch `app.py` on an alternative port by modifying the last line of `app.py`:
-```python
-app.run(host="127.0.0.1", port=5050, debug=True)
-```
-Then navigate to `http://127.0.0.1:5050`.
-
-**Q: My transactions are not saving to the SQLite database.**  
-A: Check the top navbar indicator. If it shows `🟡 Local Offline Mode`, the page was opened via `file://` or the Flask server is not running. Start `python app.py` and open `http://127.0.0.1:5000`.
-
-**Q: How do I reset demo data to factory defaults?**  
-A: Click the **↺ Reset Demo** button in the dashboard toolbar, or send a `POST` request to `/api/reset-demo`.
-
----
 
 ## 📄 License
 This project is open-source and released under the **MIT License**. Free for educational and personal use.
